@@ -31,3 +31,6 @@ target/
 *.o
 *.obj
 .DS_Store
+
+# 本地引导的Python依赖（容器内由requirements.txt安装）
+.pylibs/

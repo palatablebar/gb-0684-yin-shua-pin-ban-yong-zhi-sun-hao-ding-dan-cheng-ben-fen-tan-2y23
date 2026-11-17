@@ -13,6 +13,7 @@
 | M5 余料结转 | 查看并复算余料结转 | `/api/m5_calculate` | `app/modules/m5_calculate/rules.py` | `tests/test_calculate.py` |
 | M6 成本对账 | 查看并复算成本对账 | `/api/m6_reconcile` | `app/modules/m6_reconcile/compare.py` | `tests/test_reconcile.py` |
 | M7 批次归档 | 查看并复算批次归档 | `/api/m7_archive` | `app/modules/m7_archive/export_out.py` | `tests/test_archive.py` |
+| M8 换纸裁决 | 查看并复算换纸裁决与封存 | `/api/m8_substitution` | `app/modules/m8_substitution/rules.py` | `tests/test_substitution.py`、`tests/test_substitution_api.py` |
 
 ## 陷阱登记
 
@@ -31,6 +32,10 @@
 | TRAP-26 | 旧版本复核 | 覆盖新结论 | 事务条件更新 | `app/store.py` | `tests/test_archive.py::test_stale_review` |
 | TRAP-15 | cm与mm | 尺寸相差10倍 | 尺寸统一mm | `app/modules/m3_versions/rules.py` | `tests/test_versions.py::test_real_cm_conversion` |
 | TRAP-24 | 分币尾差 | 合计不相等 | 按纸批最大余额 | `app/modules/m5_calculate/rules.py` | `tests/test_calculate.py::test_largest_remainder` |
+| TRAP-30 | 未选纸批被预占 | 候选即扣库存 | 仅被选做法在projection扣减 | `app/modules/m8_substitution/reconcile.py` | `tests/test_substitution.py::test_unselected_lots_are_not_preempted` |
+| TRAP-31 | 刚好够产两做法混淆 | 只给一种排数 | full/split双口径并标注exact_fit | `app/modules/m8_substitution/rules.py` | `tests/test_substitution.py::test_exact_fit_flagged_and_two_policies_differ` |
+| TRAP-32 | 封存失败覆盖旧版 | 先写后验 | 对账通过才条件写入，失败保留旧版 | `app/store.py` | `tests/test_substitution.py::test_seal_idempotent_and_keeps_old_on_failure` |
+| TRAP-33 | 重跑重复计纸计成本 | 每次封存新增 | 决策指纹INSERT OR IGNORE幂等 | `app/store.py` | `tests/test_substitution_api.py::test_seal_flow_via_api` |
 
 ## 对账规则
 

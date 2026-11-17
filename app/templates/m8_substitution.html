@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="press-grid">
+  <section class="panel dominant">
+    <div class="panel-head"><h2>换纸裁决 · 订单排产决定</h2><span>策略 {{ '整单换纸 full' if data.substitution.policy=='full' else '分段补足 split' }}</span></div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>订单 / 交期</th><th>候选纸批做法</th><th>排数(副)</th><th>总张数</th><th>可用→扣后</th><th>重量 kg</th><th>成本 CNY</th><th>裁决</th></tr></thead>
+        <tbody>
+        {% for d in data.substitution.decisions %}
+          {% for c in d.candidates %}
+          {% set seg_lots = d.selected.segments|map(attribute='lot')|list if d.selected and d.selected.segments else [] %}
+          <tr class="{{'cand-pick' if d.selected and ((d.selected.lot==c.lot and not d.selected.segments) or c.lot in seg_lots) else 'cand-mute' if not c.feasible else ''}}">
+            <td>{{ d.order_id }}<br><small>{{ d.due }} · {{ '原纸' if c.kind=='ORIGINAL' else '换纸' }} {{ c.lot }}</small></td>
+            <td>{{ c.columns }}×{{ c.rows }}{{ ' 旋转90°' if c.rotated else ' 0°' }}</td>
+            <td class="number">{{ c.copies }}</td>
+            <td class="number">{{ c.gross }}</td>
+            <td class="number">{{ c.available }} → {{ c.available - c.gross if c.feasible else '不足' }}</td>
+            <td class="number">{{ '%.3f'|format(c.weight_kg|float) }}</td>
+            <td class="number">{{ '%.4f'|format(c.exact_cost|float) }}</td>
+            <td>{% if not c.feasible %}<span class="reject">不可行</span>{% elif d.selected and d.selected.lot==c.lot and not d.selected.segments %}<b>本批选用</b>{% elif c.lot in seg_lots %}<b>分段采用</b>{% else %}候选{% endif %}</td>
+          </tr>
+          {% endfor %}
+          {% if d.selected and d.selected.segments %}
+          <tr class="cand-pick">
+            <td>{{ d.order_id }}<br><small>分段补足</small></td>
+            <td colspan="6">
+              {% for s in d.selected.segments %}段{{ loop.index }} {{ s.lot }}（{{ '原纸' if s.kind=='ORIGINAL' else '换纸' }}）：净 {{ s.net }} / 开机 {{ s.fixed_loss }} / 损耗 {{ s.run_loss }} / 共 {{ s.gross }} 张；{% endfor %}
+              合计 {{ d.selected.gross }} 张，{{ '%.3f'|format(d.selected.weight_kg|float) }} kg
+            </td>
+            <td><b>本批选用</b></td>
+          </tr>
+          {% endif %}
+          <tr class="decision-row">
+            <td colspan="8">
+              <b>{{ d.order_id }}</b>：
+              {% if d.status=='RELEASED' %}坚持原纸 {{ d.source_lot }}，整单放行{% endif %}
+              {% if d.status=='SWAPPED' and d.reason=='FULL' %}原纸 {{ d.source_lot }} 不足，整单换至 {{ d.selected.lot }}（替代 {{ d.selected.replaced_lot }}）{% endif %}
+              {% if d.status=='SWAPPED' and d.reason=='SPLIT' %}原纸 {{ d.source_lot }} 不足，分段补足 {{ d.selected.lot }}{% endif %}
+              {% if d.status=='SHORTAGE' %}<span class="reject">{{ d.note }}，不放行、不占用任何纸批</span>{% endif %}
+              {% if d.status=='BLOCKED' %}<span class="reject">{{ d.note }}</span>{% endif %}
+              {% if d.exact_fit %}<span class="badge-exact">换纸批刚好够产 · 整单/分段两种做法排数、库存、成本不同</span>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel side">
+    <div class="panel-head"><h2>纸批后续可用量（预演未预占）</h2></div>
+    {% for p in data.substitution.projection %}
+    <div class="lot-card">
+      <span>{{ p.lot }} · {{ p.gsm }}gsm · {{ p.price_kg }}元/kg · {{ p.paper_w }}×{{ p.paper_h }}</span>
+      <b>{{ p.closing }} <small>张</small></b>
+      <div class="meter"><i style="width:{{ (p.closing / p.opening * 100) if p.opening else 0 }}%"></i></div>
+      <p>期初 {{ p.opening }} / 本批耗用 {{ p.consumed }} / 期末 {{ p.closing }}</p>
+    </div>
+    {% endfor %}
+    <div class="panel-head" style="border-top:1px solid var(--line)"><h2>整批对账</h2><span>{{ '平衡可封存' if data.substitution.reconcile.balanced else '未平不可封存' }}</span></div>
+    <dl>
+      <dt>行数账</dt><dd>{{ '相符' if data.substitution.reconcile.count_balanced else '异常' }}（{{ data.substitution.reconcile.accepted }}/{{ data.substitution.reconcile.input }}）</dd>
+      <dt>库存守恒</dt><dd>{{ '相符' if data.substitution.reconcile.stock_balanced else '异常' }}</dd>
+      <dt>订单成本守恒</dt><dd>{{ '相符' if data.substitution.reconcile.cost_balanced else '异常' }}（{{ data.substitution.business.total_cost }}）</dd>
+      <dt>未选纸批不预占</dt><dd>{{ '相符' if data.substitution.reconcile.no_preempt else '异常' }} {{ data.substitution.reconcile.untouched_lots }}</dd>
+      <dt>放行 / 换纸 / 缺纸</dt><dd>{{ data.substitution.business.released_orders }} / {{ data.substitution.business.swapped_orders }} / {{ data.substitution.business.shortage_orders }}</dd>
+      <dt>总用纸 / 余料</dt><dd>{{ data.substitution.business.sheets }} 张 / {{ data.substitution.business.leftover }} 张</dd>
+    </dl>
+    <div class="actions">
+      <button id="seal" class="solid" data-id="{{ run.run_id }}" data-v="{{ run.review_version }}" {{ 'disabled' if not data.substitution.reconcile.balanced }}>整批对账通过后封存</button>
+      <a class="link" href="/api/m8_substitution/seals">已封存台账</a>
+    </div>
+    <div class="panel-head" style="border-top:1px solid var(--line)"><h2>裁决口径与样例</h2></div>
+    <form id="sub-input">
+      <label>样例<select name="sample"><option {{ 'selected' if run.manifest.parameters.sample=='shortage.csv' }}>shortage.csv</option><option>dirty.csv</option><option>clean.csv</option><option>legacy.csv</option></select></label>
+      <label>换纸策略<select name="policy"><option value="full" {{ 'selected' if data.substitution.policy=='full' }}>整单换纸 full（默认）</option><option value="split" {{ 'selected' if data.substitution.policy=='split' }}>分段补足 split（原纸+换纸两段开机损耗）</option></select></label>
+      <button class="solid">重新裁决</button>
+    </form>
+  </section>
+
+  {% include "review_queue.html" %}
+</div>
+{% endblock %}

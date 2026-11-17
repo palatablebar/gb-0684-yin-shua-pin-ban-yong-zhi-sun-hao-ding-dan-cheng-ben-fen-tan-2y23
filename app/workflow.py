@@ -5,11 +5,12 @@ from app.errors import DomainError
 from app.manifest import identity,manifest
 
 def load(sample):
-    if sample not in ('dirty.csv','clean.csv','legacy.csv'):raise DomainError('SAMPLE','样例名称无效')
+    if sample not in ('dirty.csv','clean.csv','legacy.csv','shortage.csv'):raise DomainError('SAMPLE','样例名称无效')
     return (Path(__file__).resolve().parents[1]/'sample_data'/sample).read_bytes()
 
-def run(content,parameters=None,stage=7):
+def run(content,parameters=None,stage=None):
     if len(content)>2_000_000:raise DomainError('SIZE','文件超过2MB',413)
+    if stage is None:stage=len(MODULES)
     params=parameters or {}
     if not isinstance(params,dict):raise DomainError('PARAMETERS','参数必须是对象')
     start=time.monotonic();state=None

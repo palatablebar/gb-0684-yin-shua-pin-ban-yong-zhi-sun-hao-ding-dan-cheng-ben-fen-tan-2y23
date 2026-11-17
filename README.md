@@ -19,10 +19,13 @@ docker compose up --build -d
 - 余料结转：`/m5_calculate`、`/api/m5_calculate`
 - 成本对账：`/m6_reconcile`、`/api/m6_reconcile`
 - 批次归档：`/m7_archive`、`/api/m7_archive`
+- 换纸裁决：`/m8_substitution`、`/api/m8_substitution`（封存 `POST /api/runs/<id>/seal`，台账 `/api/m8_substitution/seals`）
 
 ## 核心规则
 
 按版面旋转比较可排数量，固定开机损耗与印量损耗分开计，再对订单做最大余数分摊。完整数值、边界和异常定义见 `docs/DATA-DICTIONARY.md`。
+
+换纸裁决面向临近交期、原纸不足的订单：枚举原纸与各可换纸批做法，按交期顺序预演。`full`（默认）整单换纸、开机损耗只计一次并保住原纸余量；`split` 先用原纸余量再由换纸批补足、两段各计开机损耗，两种口径在“刚好够产”时给出不同排数、库存与成本。未选中的纸批不预占，无可行做法的订单不占用任何纸批。整批对账（行数/库存/成本守恒、未选不预占、可行性）通过后才封存，失败保留旧版；同一排产决定按决策指纹幂等，重跑不新增用纸和订单成本。参数 `substitution_policy=full|split`，样例 `shortage.csv`。
 
 ## 验证
 
